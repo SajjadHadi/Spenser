@@ -1,14 +1,15 @@
 mod db;
+mod migrations;
 mod users;
 
+use crate::db::utils::run_migrations;
 use actix_web::{
-    web::{scope, Data}, App,
-    HttpServer,
+    App, HttpServer,
+    web::{Data, scope},
 };
+use db::utils::establish_connection;
 use sea_orm::DatabaseConnection;
 use users::routes::user_routes;
-use db::utils::establish_connection;
-
 
 struct AppState {
     db: DatabaseConnection,
@@ -18,6 +19,8 @@ struct AppState {
 async fn main() -> std::io::Result<()> {
     let pool = establish_connection().await?;
     let app_state = Data::new(AppState { db: pool });
+
+    run_migrations(&app_state.db).await?;
 
     HttpServer::new(move || {
         App::new()
