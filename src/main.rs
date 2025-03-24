@@ -1,31 +1,35 @@
-mod db;
+mod controllers;
+mod entities;
+mod middlewares;
 mod migrations;
-mod users;
+pub mod routes;
+mod utils;
 
-use crate::db::utils::run_migrations;
-use actix_web::{
-    App, HttpServer,
-    web::{Data, scope},
-};
-use db::utils::establish_connection;
+use actix_web::{App, HttpServer, web::Data};
 use sea_orm::DatabaseConnection;
-use users::routes::user_routes;
+use std::{env, io::Result};
+use utils::db::establish_connection;
+use utils::db::run_migrations;
 
 struct AppState {
     db: DatabaseConnection,
+    jwt_secret: String,
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<()> {
     let pool = establish_connection().await?;
-    let app_state = Data::new(AppState { db: pool });
+    let app_state = Data::new(AppState {
+        jwt_secret: env::var("JWT_SECRET").unwrap(),
+        db: pool,
+    });
 
     run_migrations(&app_state.db).await?;
 
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
-            .service(scope("/user").configure(user_routes))
+            .configure(routes::configure_routes)
     })
     .bind(("0.0.0.0", 8005))?
     .run()
